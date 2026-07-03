@@ -1,7 +1,7 @@
 import streamlit as st
 import numpy as np
 from PIL import Image
-import keras
+import onnxruntime as ort
 
 st.set_page_config(
     page_title='🐱🐶 Cats vs Dogs Classifier',
@@ -11,9 +11,9 @@ st.set_page_config(
 
 @st.cache_resource
 def load_model():
-    return keras.models.load_model('cats_dogs_mobilenetv2.keras')
+    return ort.InferenceSession('cats_dogs_model.onnx')
 
-model = load_model()
+session = load_model()
 
 # ------- UI -------
 st.title('🐱🐶 Cats vs Dogs Classifier')
@@ -35,11 +35,13 @@ if uploaded_file is not None:
 
     # Prétraitement
     img_resized = img.resize((150, 150))
-    img_array   = np.expand_dims(np.array(img_resized) / 255.0, axis=0)
+    img_array   = np.expand_dims(np.array(img_resized) / 255.0, axis=0).astype(np.float32)
 
     # Prédiction
     with st.spinner('Analyse en cours...'):
-        proba = float(model.predict(img_array)[0][0])
+        input_name = session.get_inputs()[0].name
+        output_name = session.get_outputs()[0].name
+        proba = float(session.run([output_name], {input_name: img_array})[0][0][0])
 
     label = 'Chien 🐶' if proba > 0.5 else 'Chat 🐱'
     conf  = proba if proba > 0.5 else 1.0 - proba
